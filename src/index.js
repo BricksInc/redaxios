@@ -210,13 +210,15 @@ function create(defaults) {
 				return response;
 			}
 
-			return res[options.responseType || 'text']()
+			return res.text()
 				.then((data) => {
 					response.data = data;
-					// its okay if this fails: response.data will be the unparsed value:
-					response.data = JSON.parse(data);
+					try {
+						response.data = JSON.parse(data);
+					} catch (e) {
+						// JSON parse failed — keep raw string in response.data
+					}
 				})
-				.catch(Object)
 				.then(() => {
 					const ok = options.validateStatus ? options.validateStatus(res.status) : res.ok;
 					return ok ? response : Promise.reject(response);
