@@ -218,12 +218,23 @@
 	        response.data = res.body;
 	        return response;
 	      }
-	      return res.text().then(function (data) {
+
+	      // FIX: For text-like response types (json, text, or default), we use res.text() + JSON.parse()
+	      // instead of res[responseType]() to prevent silent body stream errors.
+	      // Original code used res.json() which, on body stream failure, would reject into .catch(Object)
+	      // that silently swallowed the error — leaving response.data as undefined.
+	      // By splitting into res.text() + JSON.parse(), stream errors propagate as real errors,
+	      // while JSON parse failures safely fall back to the raw string in response.data.
+	      // For other response types (blob, arrayBuffer, formData), we preserve original behavior.
+	      var isTextLike = !options.responseType || options.responseType === 'text' || options.responseType === 'json';
+	      return (isTextLike ? res.text() : res[options.responseType]()).then(function (data) {
 	        response.data = data;
-	        try {
-	          response.data = JSON.parse(data);
-	        } catch (e) {
-	          // JSON parse failed — keep raw string in response.data
+	        if (isTextLike) {
+	          try {
+	            response.data = JSON.parse(data);
+	          } catch (e) {
+	            // JSON parse failed — keep raw string in response.data
+	          }
 	        }
 	      }).then(function () {
 	        var ok = options.validateStatus ? options.validateStatus(res.status) : res.ok;
